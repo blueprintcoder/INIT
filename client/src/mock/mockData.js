@@ -1,24 +1,59 @@
-// Yash: Use this mock data to build your components immediately without waiting for the backend!
 export const initialPortfolio = {
   totalValue: 10000000,
-  cashBuffer: 1500000,
-  activeMode: 'ADVISORY',
+  cash: 1500000,
+  activeMode: "AUTONOMOUS",
+
+  holdings: [
+    {
+      symbol: "SPY",
+      name: "S&P 500 ETF",
+      current: 25,
+      target: 30,
+      color: "#222222",
+    },
+    {
+      symbol: "QQQ",
+      name: "Nasdaq 100 ETF",
+      current: 20,
+      target: 15,
+      color: "#666666",
+    },
+    {
+      symbol: "IEF",
+      name: "7-10 Year Treasury ETF",
+      current: 25,
+      target: 25,
+      color: "#888888",
+    },
+    {
+      symbol: "LQD",
+      name: "Investment Grade Bonds",
+      current: 15,
+      target: 20,
+      color: "#aaaaaa",
+    },
+    {
+      symbol: "USD",
+      name: "Cash and Equivalents",
+      current: 15,
+      target: 10,
+      color: "#cccccc",
+    },
+  ],
+
   metrics: {
-    sharpeRatio: 1.85,
+    sharpe: 1.85,
     var95: 0.024,
     cvar95: 0.038,
-    status: 'HEALTHY'
+    pnl: 34200,
+    volatility: 8.4,
+    status: "HEALTHY",
   },
-  holdings: [
-    { symbol: 'SPY', name: 'S&P 500 ETF', weight: 0.25, targetWeight: 0.25, value: 2500000 },
-    { symbol: 'QQQ', name: 'Tech Growth', weight: 0.20, targetWeight: 0.20, value: 2000000 },
-    { symbol: 'IEF', name: '10Y US Treasury', weight: 0.25, targetWeight: 0.25, value: 2500000 },
-    { symbol: 'LQD', name: 'Corporate Bonds', weight: 0.15, targetWeight: 0.15, value: 1500000 },
-    { symbol: 'USD', name: 'Cash Reserve', weight: 0.15, targetWeight: 0.15, value: 1500000 }
-  ],
+
   circuitBreaker: {
     triggered: false,
     tier: 0,
-    message: 'All risk metrics within normal parameters.'
-  }
+    message:
+      "Portfolio is operating within all configured risk limits.",
+  },
 };
