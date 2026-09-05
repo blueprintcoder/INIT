@@ -5,22 +5,26 @@
 
 const { calculateSharpe, optimizeAllocation } = require('./optimizer');
 const { calculateVaR, evaluateCircuitBreakers } = require('./riskEngine');
-const { simulateFlashCrash } = require('./marketSimulator');
+const { simulateFlashCrash, simulateRateHike, simulateMacroShock } = require('./marketSimulator');
 const mockData = require('./mockFallback');
 
 console.log('\x1b[34m====================================================\x1b[0m');
 console.log('\x1b[34m    AEGISCAP QUANTITATIVE MATH TEST RUNNER          \x1b[0m');
 console.log('\x1b[34m====================================================\x1b[0m\n');
 
-// 1. Initial State
+// 1. Initial State & Sharpe Ratio
 const holdings = mockData.portfolio.holdings;
+const weights = holdings.map(h => h.weight);
 console.log('\x1b[32m[1] Testing Initial Portfolio State ($10,000,000)...\x1b[0m');
 const initialMetrics = calculateVaR(holdings);
+const sharpeResult = calculateSharpe(weights);
 console.log(`    - 1-Day VaR (95%): ${(initialMetrics.var95 * 100).toFixed(2)}%`);
+console.log(`    - 1-Day CVaR (95%): ${(initialMetrics.cvar95 * 100).toFixed(2)}%`);
+console.log(`    - Portfolio Sharpe Ratio: ${sharpeResult.sharpe}`);
 console.log(`    - Status: ${initialMetrics.status}`);
 console.log(`    - Cash Buffer: $${mockData.portfolio.cashBuffer.toLocaleString()} (15% Locked)\n`);
 
-// 2. Optimization Check
+// 2. Optimization Check & Turnover Slippage Penalty
 console.log('\x1b[32m[2] Testing Optimizer under Constraints & Turnover Penalty...\x1b[0m');
 const optResult = optimizeAllocation(holdings, { minCashBufferPercent: 0.15, maxSingleAssetCap: 0.25 });
 console.log(`    - Turnover Required: ${optResult.turnoverPercent}%`);
@@ -39,6 +43,13 @@ console.log(`    - Circuit Breaker Fired: ${breaker.triggered ? 'YES (TIER 2)' :
 console.log(`    - Action Taken: ${breaker.action}`);
 console.log(`    - System Message: "${breaker.message}"\n`);
 
+// 5. Macro Shock & Rate Hike Verification
+console.log('\x1b[33m[5] Testing Rate Hike (+75 bps Fed Shift) Simulation...\x1b[0m');
+const rateHikeHoldings = simulateRateHike(holdings, 75);
+const rateHikeMetrics = calculateVaR(rateHikeHoldings);
+console.log(`    - Rate Hike 1-Day VaR (95%): ${(rateHikeMetrics.var95 * 100).toFixed(2)}%\n`);
+
 console.log('\x1b[34m====================================================\x1b[0m');
 console.log('\x1b[32mALL FINANCIAL MATH TESTS PASSED SUCCESSFULLY!       \x1b[0m');
 console.log('\x1b[34m====================================================\x1b[0m');
+

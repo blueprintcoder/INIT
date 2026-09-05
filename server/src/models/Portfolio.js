@@ -8,7 +8,13 @@ const HoldingSchema = new mongoose.Schema({
   targetWeight: { type: Number, required: true },
   value: { type: Number, required: true },
   currentPrice: { type: Number, required: true },
-  volatility: { type: Number, default: 0.15 }
+  volatility: { type: Number, default: 0.15 },
+  accountingClass: { type: String, enum: ['HTM', 'AFS', 'HFT'], default: 'AFS' },
+  durationYears: { type: Number, default: 1.0 },
+  riskWeight: { type: Number, default: 0.20 },
+  hqlaLevel: { type: String, enum: ['L1', 'L2A', 'L2B', 'NON_HQLA'], default: 'L1' },
+  dailyVolume: { type: Number, default: 50000000 },
+  bidAskSpreadBps: { type: Number, default: 5 }
 });
 
 const PortfolioSchema = new mongoose.Schema({
@@ -21,6 +27,11 @@ const PortfolioSchema = new mongoose.Schema({
     var95: { type: Number, default: 0.024 },
     cvar95: { type: Number, default: 0.038 },
     status: { type: String, default: 'HEALTHY' }
+  },
+  circuitBreaker: {
+    triggered: { type: Boolean, default: false },
+    tier: { type: Number, default: 0 },
+    message: { type: String, default: 'All risk metrics within normal parameters.' }
   },
   holdings: [HoldingSchema],
   updatedAt: { type: Date, default: Date.now }
