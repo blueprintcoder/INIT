@@ -1,15 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { optimizeAllocation } = require('../engine/optimizer');
-const mockData = require('../engine/mockFallback');
+const controller = require('../controllers/rebalanceController');
 
-router.post('/optimize', (req, res) => {
-  const result = optimizeAllocation(mockData.portfolio.holdings, { minCashBufferPercent: 0.15, maxSingleAssetCap: 0.25 });
-  res.json(result);
-});
-
-router.post('/execute', (req, res) => {
-  res.json({ success: true, message: 'Rebalancing executed and logged in audit trail.' });
-});
+router.post('/optimize', controller.optimize);
+router.post('/execute', controller.execute);
 
 module.exports = router;

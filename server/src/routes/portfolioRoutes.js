@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const mockData = require('../engine/mockFallback');
+const controller = require('../controllers/portfolioController');
 
-router.get('/', (req, res) => {
-  // Returns current portfolio state
-  res.json(mockData.portfolio);
-});
+router.get('/', controller.getPortfolio);
+router.post('/sync-live', controller.syncLive);
+router.post('/reset', controller.resetPortfolio);
+router.post('/toggle-mode', controller.toggleMode);
+router.get('/policy', controller.getPolicy);
+router.post('/policy', controller.updatePolicy);
 
 module.exports = router;
