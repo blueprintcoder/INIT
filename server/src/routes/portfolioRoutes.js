@@ -5,6 +5,7 @@ const controller = require('../controllers/portfolioController');
 router.get('/', controller.getPortfolio);
 router.post('/sync-live', controller.syncLive);
 router.post('/reset', controller.resetPortfolio);
+router.post('/configure', controller.configurePortfolio);
 router.post('/toggle-mode', controller.toggleMode);
 router.get('/policy', controller.getPolicy);
 router.post('/policy', controller.updatePolicy);

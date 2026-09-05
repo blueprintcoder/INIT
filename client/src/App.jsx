@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
+import { io } from "socket.io-client";
 
 import Navbar from "./components/Navbar";
 import ExecutiveMetrics from "./components/ExecutiveMetrics";
@@ -9,29 +10,89 @@ import WhatIfSimulator from "./components/WhatIfSimulator";
 import CircuitBreakerPanel from "./components/CircuitBreakerPanel";
 import AuditFeed from "./components/AuditFeed";
 import GlassCard from "./components/GlassCard";
+import ConfigureModal from "./components/ConfigureModal";
+import RebalanceComparison from "./components/RebalanceComparison";
+import StressSliders from "./components/StressSliders";
+import NaturalPolicyInput from "./components/NaturalPolicyInput";
 
 import { initialPortfolio } from "./mock/mockData";
+
+const API_BASE = "http://localhost:5000/api";
 
 export default function App() {
   const [portfolio, setPortfolio] = useState(initialPortfolio);
   const [activeSection, setActiveSection] = useState("overview");
   const [mode, setMode] = useState("ADVISORY");
+  const [isConfigureOpen, setIsConfigureOpen] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
 
   const [circuitBreaker, setCircuitBreaker] = useState(
     initialPortfolio.circuitBreaker || {
       triggered: false,
-      message:
-        "All portfolio risk controls are within configured thresholds.",
+      message: "All portfolio risk controls are within configured thresholds.",
     }
   );
+
+  // 1. Fetch initial portfolio state from live server on mount
+  useEffect(() => {
+    fetchPortfolio();
+    fetchAuditLogs();
+
+    // Connect Socket.io client for real-time market shocks and updates
+    const socket = io("http://localhost:5000");
+
+    socket.on("market-shock", (data) => {
+      if (data && data.portfolio) {
+        setPortfolio(data.portfolio);
+        if (data.circuitBreaker) setCircuitBreaker(data.circuitBreaker);
+      }
+      fetchAuditLogs();
+    });
+
+    socket.on("portfolio-updated", (data) => {
+      if (data) {
+        setPortfolio(data);
+        if (data.circuitBreaker) setCircuitBreaker(data.circuitBreaker);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  const fetchPortfolio = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/portfolio`);
+      if (res.ok) {
+        const data = await res.json();
+        setPortfolio(data);
+        if (data.activeMode) setMode(data.activeMode);
+        if (data.circuitBreaker) setCircuitBreaker(data.circuitBreaker);
+      }
+    } catch (err) {
+      console.warn("Using offline fallback portfolio state", err);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/ai/audit-logs`);
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLogs(data);
+      }
+    } catch (err) {
+      console.warn("Using default audit logs", err);
+    }
+  };
 
   const totalValue = useMemo(() => {
     if (Number.isFinite(portfolio.totalValue)) {
       return portfolio.totalValue;
     }
-
-    return portfolio.cash || 0;
-  }, [portfolio.totalValue, portfolio.cash]);
+    return portfolio.cash || portfolio.cashBuffer || 10000000;
+  }, [portfolio.totalValue, portfolio.cash, portfolio.cashBuffer]);
 
   const handleSimulationChange = (simulationResult) => {
     setPortfolio((previousPortfolio) => ({
@@ -40,48 +101,113 @@ export default function App() {
     }));
   };
 
-  const handleToggleMode = () => {
-    setMode((previousMode) =>
-      previousMode === "AUTONOMOUS" ? "ADVISORY" : "AUTONOMOUS"
-    );
+  const handleToggleMode = async () => {
+    const newMode = mode === "AUTONOMOUS" ? "ADVISORY" : "AUTONOMOUS";
+    setMode(newMode);
+    try {
+      await fetch(`${API_BASE}/portfolio/toggle-mode`, { method: "POST" });
+    } catch (err) {
+      console.warn("Failed to toggle mode on server", err);
+    }
   };
 
-  const handleTriggerShock = () => {
+  const handleTriggerShock = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/simulate/flash-crash`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.portfolio) setPortfolio(data.portfolio);
+        if (data.circuitBreaker) setCircuitBreaker(data.circuitBreaker);
+        fetchAuditLogs();
+        return;
+      }
+    } catch (err) {
+      console.warn("Local fallback shock simulation", err);
+    }
+
     const updatedCircuitBreaker = {
       triggered: true,
-      message:
-        "Market shock detected. Order execution has been paused by the circuit breaker.",
+      tier: 2,
+      message: "Market shock detected. Tier-2 de-risking executed: $1,000,000 moved to Cash & T-Bills.",
     };
-
     setCircuitBreaker(updatedCircuitBreaker);
-
-    setPortfolio((previousPortfolio) => ({
-      ...previousPortfolio,
-      circuitBreaker: updatedCircuitBreaker,
-    }));
+    setPortfolio((prev) => ({ ...prev, circuitBreaker: updatedCircuitBreaker }));
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/portfolio/reset`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.portfolio) {
+          setPortfolio(data.portfolio);
+          if (data.portfolio.circuitBreaker) setCircuitBreaker(data.portfolio.circuitBreaker);
+        }
+        fetchAuditLogs();
+        return;
+      }
+    } catch (err) {
+      console.warn("Local reset fallback", err);
+    }
+
     const updatedCircuitBreaker = {
       triggered: false,
-      message:
-        "All portfolio risk controls are within configured thresholds.",
+      tier: 0,
+      message: "All portfolio risk controls are within configured thresholds.",
     };
-
     setCircuitBreaker(updatedCircuitBreaker);
+    setPortfolio((prev) => ({ ...prev, circuitBreaker: updatedCircuitBreaker }));
+  };
 
-    setPortfolio((previousPortfolio) => ({
-      ...previousPortfolio,
-      circuitBreaker: updatedCircuitBreaker,
-    }));
+  const handleSyncPrices = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/portfolio/sync-live`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.portfolio) setPortfolio(data.portfolio);
+      }
+    } catch (err) {
+      console.warn("Failed to sync live Yahoo Finance prices", err);
+    }
+  };
+
+  const handleConfigurePortfolio = async (configData) => {
+    try {
+      const res = await fetch(`${API_BASE}/portfolio/configure`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(configData)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.portfolio) setPortfolio(data.portfolio);
+        fetchAuditLogs();
+      }
+    } catch (err) {
+      console.warn("Offline config fallback", err);
+      if (configData.totalValue) {
+        setPortfolio(prev => ({
+          ...prev,
+          totalValue: configData.totalValue,
+          cashBuffer: Math.round(configData.totalValue * (configData.cashBufferPercent || 0.15))
+        }));
+      }
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-[#171717]">
       <div className="relative z-10">
         <Navbar
+          activeSection={activeSection}
+          setActiveSection={setActiveSection}
           mode={mode}
           onToggleMode={handleToggleMode}
+          onOpenConfigure={() => setIsConfigureOpen(true)}
+          onSyncLive={handleSyncPrices}
         />
 
         <main className="mx-auto w-full max-w-[1500px] px-4 pb-16 pt-6 sm:px-6 lg:px-8">
@@ -126,8 +252,8 @@ export default function App() {
                     </p>
 
                     <p className="mt-2 text-3xl font-bold tracking-tight text-[#111]">
-                      ₹
-                      {totalValue.toLocaleString("en-IN", {
+                      $
+                      {totalValue.toLocaleString("en-US", {
                         maximumFractionDigits: 0,
                       })}
                     </p>
@@ -144,6 +270,8 @@ export default function App() {
 
                 <ExecutiveMetrics portfolio={portfolio} />
 
+                <NaturalPolicyInput onPolicyParsed={fetchPortfolio} />
+
                 <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                   <AllocationChart portfolio={portfolio} />
 
@@ -156,13 +284,15 @@ export default function App() {
                   />
                 </section>
 
+                <RebalanceComparison portfolio={portfolio} />
+
                 <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                   <WhatIfSimulator
                     portfolio={portfolio}
                     onSimulationChange={handleSimulationChange}
                   />
 
-                  <AuditFeed />
+                  <AuditFeed logs={auditLogs} />
                 </section>
               </motion.div>
             )}
@@ -190,6 +320,8 @@ export default function App() {
                     volatility spikes, and liquidity shocks.
                   </p>
                 </section>
+
+                <StressSliders portfolio={portfolio} />
 
                 <WhatIfSimulator
                   portfolio={portfolio}
@@ -224,11 +356,18 @@ export default function App() {
                   </p>
                 </section>
 
-                <AuditFeed />
+                <AuditFeed logs={auditLogs} />
               </motion.div>
             )}
           </AnimatePresence>
         </main>
+
+        <ConfigureModal
+          isOpen={isConfigureOpen}
+          onClose={() => setIsConfigureOpen(false)}
+          onApplyConfig={handleConfigurePortfolio}
+          currentPortfolio={portfolio}
+        />
       </div>
     </div>
   );

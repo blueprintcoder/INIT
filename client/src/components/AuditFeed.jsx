@@ -35,7 +35,18 @@ const defaultEvents = [
   },
 ];
 
-export default function AuditFeed() {
+export default function AuditFeed({ logs = [] }) {
+  const displayEvents = (logs && logs.length > 0)
+    ? logs.map((log, idx) => ({
+        id: log.id || idx,
+        type: log.actionType ? log.actionType.replace('_', ' ') : 'AI LOG',
+        title: log.trigger || log.actionType || 'Audit Event Logged',
+        description: log.aiMemo || `Pre-VaR: ${(log.preVaR * 100).toFixed(2)}% -> Post-VaR: ${(log.postVaR * 100).toFixed(2)}%`,
+        time: log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : 'Just now',
+        icon: log.actionType?.includes('CIRCUIT') ? ShieldCheck : Bot
+      }))
+    : defaultEvents;
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 10 }}
@@ -63,17 +74,17 @@ export default function AuditFeed() {
         </span>
       </div>
 
-      <div className="divide-y divide-[#eeeeee]">
-        {defaultEvents.map((event, index) => {
-          const Icon = event.icon;
+      <div className="divide-y divide-[#eeeeee] max-h-[420px] overflow-y-auto">
+        {displayEvents.map((event, index) => {
+          const Icon = event.icon || Activity;
 
           return (
             <motion.div
-              key={`${event.id}-${event.title}`}
+              key={`${event.id}-${index}`}
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{
-                delay: 0.35 + index * 0.04,
+                delay: 0.1 + index * 0.04,
                 duration: 0.2,
                 ease: "easeOut",
               }}
@@ -94,7 +105,7 @@ export default function AuditFeed() {
                   </span>
                 </div>
 
-                <p className="mt-1 text-xs leading-5 text-[#888]">
+                <p className="mt-1 text-xs leading-5 text-[#888] whitespace-pre-line">
                   {event.description}
                 </p>
 

@@ -118,10 +118,24 @@ function getAuditLogs() {
   return JSON.parse(JSON.stringify(auditLogs));
 }
 
+function configurePortfolio({ name, totalValue, cashBuffer, holdings, metrics, circuitBreaker, policy }) {
+  if (totalValue !== undefined) portfolioState.totalValue = totalValue;
+  if (cashBuffer !== undefined) portfolioState.cashBuffer = cashBuffer;
+  if (name !== undefined) portfolioState.name = name;
+  if (holdings !== undefined) portfolioState.holdings = JSON.parse(JSON.stringify(holdings));
+  if (metrics !== undefined) portfolioState.metrics = { ...portfolioState.metrics, ...metrics };
+  if (circuitBreaker !== undefined) portfolioState.circuitBreaker = { ...portfolioState.circuitBreaker, ...circuitBreaker };
+  if (policy !== undefined) riskPolicyState = { ...riskPolicyState, ...policy };
+
+  portfolioState.lastUpdated = new Date().toISOString();
+  return getPortfolio();
+}
+
 module.exports = {
   getPortfolio,
   updatePortfolio,
   resetPortfolio,
+  configurePortfolio,
   getPolicy,
   updatePolicy,
   addAuditLog,

@@ -122,7 +122,70 @@ Return a JSON object with:
   };
 }
 
+async function parseNaturalPolicy(policyText) {
+  const text = (policyText || '').toLowerCase();
+
+  let minCashBufferPercent = 0.15;
+  let maxSingleAssetCap = 0.25;
+  let maxAllowableVaR95 = 0.040;
+  const detectedRules = [];
+
+  const cashMatch = text.match(/(?:cash|liquidity)[^\d]*(\d+)%/);
+  if (cashMatch) {
+    minCashBufferPercent = parseInt(cashMatch[1], 10) / 100;
+    detectedRules.push(`Minimum Cash Reserve: ${(minCashBufferPercent * 100).toFixed(0)}%`);
+  } else if (text.includes('conservative') || text.includes('high cash')) {
+    minCashBufferPercent = 0.20;
+    detectedRules.push('Minimum Cash Reserve: 20% (Conservative Guardrail)');
+  } else {
+    detectedRules.push('Minimum Cash Reserve: 15% (Preserved)');
+  }
+
+  const capMatch = text.match(/(?:stock|equity|single asset|cap)[^\d]*(\d+)%/);
+  if (capMatch) {
+    maxSingleAssetCap = parseInt(capMatch[1], 10) / 100;
+    detectedRules.push(`Single Asset Exposure Cap: ${(maxSingleAssetCap * 100).toFixed(0)}%`);
+  } else {
+    detectedRules.push('Single Asset Exposure Cap: 25% (Preserved)');
+  }
+
+  const varMatch = text.match(/(?:var|risk|loss limit)[^\d]*(\d+)%/);
+  if (varMatch) {
+    maxAllowableVaR95 = parseInt(varMatch[1], 10) / 100;
+    detectedRules.push(`Maximum 1-Day VaR Limit: ${(maxAllowableVaR95 * 100).toFixed(1)}%`);
+  } else {
+    detectedRules.push('Maximum 1-Day VaR Limit: 4.0% (Preserved)');
+  }
+
+  const prompt = `You are a Chief Risk Officer AI. Parse this corporate risk mandate: "${policyText}".
+Return a JSON object with:
+{"minCashBufferPercent": number (e.g. 0.20), "maxSingleAssetCap": number (e.g. 0.25), "maxAllowableVaR95": number (e.g. 0.04), "detectedRules": [string]}`;
+
+  const aiReply = await callGeminiApi(prompt);
+  if (aiReply) {
+    try {
+      const parsed = JSON.parse(aiReply.replace(/```json/g, '').replace(/```/g, '').trim());
+      return {
+        policyText,
+        minCashBufferPercent: parsed.minCashBufferPercent || minCashBufferPercent,
+        maxSingleAssetCap: parsed.maxSingleAssetCap || maxSingleAssetCap,
+        maxAllowableVaR95: parsed.maxAllowableVaR95 || maxAllowableVaR95,
+        detectedRules: parsed.detectedRules && parsed.detectedRules.length > 0 ? parsed.detectedRules : detectedRules
+      };
+    } catch {}
+  }
+
+  return {
+    policyText,
+    minCashBufferPercent,
+    maxSingleAssetCap,
+    maxAllowableVaR95,
+    detectedRules
+  };
+}
+
 module.exports = {
   generateAuditMemo,
-  parseWhatIfScenario
+  parseWhatIfScenario,
+  parseNaturalPolicy
 };

@@ -3,6 +3,7 @@ const router = express.Router();
 const controller = require('../controllers/aiController');
 
 router.post('/what-if', controller.whatIf);
+router.post('/parse-policy', controller.parsePolicy);
 router.get('/audit-logs', controller.getAuditLogs);
 
 module.exports = router;

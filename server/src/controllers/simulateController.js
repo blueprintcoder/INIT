@@ -68,10 +68,14 @@ exports.flashCrash = async (req, res) => {
       aiMemo
     });
 
+const { normalizePortfolio } = require('./portfolioController');
+
+    const normalizedPortfolio = normalizePortfolio(updatedPortfolio);
+
     const payload = {
-      portfolio: updatedPortfolio,
+      portfolio: normalizedPortfolio,
       metrics: shockedMetrics,
-      circuitBreaker: updatedPortfolio.circuitBreaker,
+      circuitBreaker: normalizedPortfolio.circuitBreaker,
       aiMemo,
       auditLog: auditEntry
     };
